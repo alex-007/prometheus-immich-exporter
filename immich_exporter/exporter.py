@@ -63,68 +63,68 @@ class ImmichMetricsCollector:
 
     def get_immich_users_stat(self):
         try:
-            endpoint_user_stats = "/api/server-info/statistics"
-            response_user_stats = self.request(endpoint_user_stats).json()
+            endpoint_user_stats = "/api/server/statistics"
+            response = self.request(endpoint_user_stats).json()
         except requests.exceptions.RequestException as e:
             logger.error(f"API ERROR: can't get server statistic: {e}")
 
-        user_data = response_user_stats["usageByUser"]
-        user_count = len(response_user_stats["usageByUser"])
-        photos_growth_total = 0
-        videos_growth_total = 0
-        usage_growth_total = 0
+        user_data = response["usageByUser"]
+        user_count = len(response["usageByUser"])
+        photos_growth_total = response["photos"]
+        videos_growth_total = response["videos"]
+        usage_growth_total = response["usage"]
 
         metrics = []
 
         for x in range(0, user_count):
-            photos_growth_total += user_data[x]["photos"]
-            videos_growth_total += user_data[x]["videos"]
-            usage_growth_total += user_data[x]["usage"]
+            # photos_growth_total += user_data[x]["photos"]
+            # videos_growth_total += user_data[x]["videos"]
+            # usage_growth_total += user_data[x]["usage"]
             metrics.append(
                 {
-                    "name": f"{self.config['metrics_prefix']}_server_stats_photos_by_users",
-                    "value": user_data[x]['photos'],
+                    "name": f"{self.config["metrics_prefix"]}_server_stats_photos_by_users",
+                    "value": user_data[x]["photos"],
                     "labels": {"firstName": user_data[x]["userName"].split()[0]},
-                    "help": f"Number of photos by user {user_data[x]['userName'].split()[0]} "
+                    "help": f"Number of photos by user {user_data[x]["userName"].split()[0]} "
                 }
             )
             metrics.append(
                 {
-                    "name": f"{self.config['metrics_prefix']}_server_stats_videos_by_users",
-                    "value": user_data[x]['videos'],
+                    "name": f"{self.config["metrics_prefix"]}_server_stats_videos_by_users",
+                    "value": user_data[x]["videos"],
                     "labels": {"firstName": user_data[x]["userName"].split()[0]},
-                    "help": f"Number of photos by user {user_data[x]['userName'].split()[0]} "
+                    "help": f"Number of photos by user {user_data[x]["userName"].split()[0]} "
                 }
             )
             metrics.append(
                 {
-                    "name": f"{self.config['metrics_prefix']}_server_stats_usage_by_users",
-                    "value": (user_data[x]['usage']),
+                    "name": f"{self.config["metrics_prefix"]}_server_stats_usage_by_users",
+                    "value": (user_data[x]["usage"]),
                     "labels": {
                         "firstName": user_data[x]["userName"].split()[0],
                     },
-                    "help": f"Number of photos by user {user_data[x]['userName'].split()[0]} "
+                    "help": f"Number of photos by user {user_data[x]["userName"].split()[0]} "
                 }
             )
 
         metrics += [
             {
-                "name": f"{self.config['metrics_prefix']}_server_stats_user_count",
+                "name": f"{self.config["metrics_prefix"]}_server_stats_user_count",
                 "value": user_count,
                 "help": "number of users on the immich server"
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_stats_photos_growth",
+                "name": f"{self.config["metrics_prefix"]}_server_stats_photos_growth",
                 "value": photos_growth_total,
                 "help": "photos counter that is added or removed"
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_stats_videos_growth",
+                "name": f"{self.config["metrics_prefix"]}_server_stats_videos_growth",
                 "value": videos_growth_total,
                 "help": "videos counter that is added or removed"
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_stats_usage_growth",
+                "name": f"{self.config["metrics_prefix"]}_server_stats_usage_growth",
                 "value": usage_growth_total,
                 "help": "videos counter that is added or removed"
             },
@@ -134,45 +134,39 @@ class ImmichMetricsCollector:
 
     def get_immich_storage(self):
         try:
-            endpoint_storage = "/api/server-info/storage"
-            response_storage = self.request(endpoint_storage).json()
+            endpoint_storage = "/api/server/storage"
+            response = self.request(endpoint_storage).json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Couldn't get storage info: {e}")
 
         return [
             {
-                "name": f"{self.config['metrics_prefix']}_server_info_diskAvailable",
-                "value": (response_storage["diskAvailableRaw"]),
+                "name": f"{self.config["metrics_prefix"]}_server_info_diskAvailable",
+                "value": (response["diskAvailableRaw"]),
                 "help": "Available space on disk",
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_info_totalDiskSize",
-                "value": (response_storage["diskSizeRaw"]),
+                "name": f"{self.config["metrics_prefix"]}_server_info_totalDiskSize",
+                "value": (response["diskSizeRaw"]),
                 "help": "total disk size",
                 # "type": "counter"
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_info_diskUse",
-                "value": (response_storage["diskUseRaw"]),
+                "name": f"{self.config["metrics_prefix"]}_server_info_diskUse",
+                "value": (response["diskUseRaw"]),
                 "help": "disk space in use",
                 # "type": "counter"
             },
             {
-                "name": f"{self.config['metrics_prefix']}_server_info_diskUsagePercentage",
-                "value": (response_storage["diskUsagePercentage"]),
+                "name": f"{self.config["metrics_prefix"]}_server_info_diskUsagePercentage",
+                "value": (response["diskUsagePercentage"]),
                 "help": "disk usage in percent",
                 # "type": "counter"
             }
         ]
 
     def get_immich_server_version_number(self):
-        # Requesting immich_server_number serves two purposes. As the name says it returns the version number
-        #   1. get version the full server version number
-        #   2. check if immich api key is correct
-        # throwing connectionRefused exception usually means that immich isn't running
-
-        server_version_endpoint = "/api/server-info/version"
-        response_server_version = ""
+        server_version_endpoint = "/api/server/about"
 
         while True:
             try:
@@ -182,13 +176,15 @@ class ImmichMetricsCollector:
                 continue
             break
 
-        server_version_number = (
-            str(response["major"]) + "." + str(response["minor"]) + "." + str(response["patch"])
-        )
+        server_version_number = response["version"]
+
+        # server_version_number = (
+        #     str(response["major"]) + "." + str(response["minor"]) + "." + str(response["patch"])
+        # )
 
         return [
             {
-                "name": f"{self.config['metrics_prefix']}_server_info_version_number",
+                "name": f"{self.config["metrics_prefix"]}_server_info_version_number",
                 "value": bool(server_version_number),
                 "help": "server version number",
                 "labels": {"version": server_version_number}
@@ -202,55 +198,55 @@ class ImmichMetricsCollector:
         cpu = psutil.cpu_percent(interval=1, percpu=False)
         return [
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
+                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
                 "value": loadAvg[0],
                 "help": "CPU Load average 1m",
                 "labels": {"period": "1m"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
+                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
                 "value": loadAvg[1],
                 "help": "CPU Load average 5m",
                 "labels": {"period": "5m"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
+                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
                 "value": loadAvg[2],
                 "help": "CPU Load average 15m",
                 "labels": {"period": "15m"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_memory",
+                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
                 "value": virtualMem[0],
                 "help": "Virtual Memory - Total",
                 "labels": {"type": "Total"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_memory",
+                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
                 "value": virtualMem[1],
                 "help": "Virtual Memory - Available",
                 "labels": {"type": "Available"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_memory",
+                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
                 "value": virtualMem[2],
                 "help": "Virtual Memory - Percent",
                 "labels": {"type": "Percent"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_memory",
+                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
                 "value": virtualMem[3],
                 "help": "Virtual Memory - Used",
                 "labels": {"type": "Used"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_memory",
+                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
                 "value": virtualMem[4],
                 "help": "Virtual Memory - Free",
                 "labels": {"type": "Free"},
             },
             {
-                "name": f"{self.config['metrics_prefix']}_system_info_cpu_usage",
+                "name": f"{self.config["metrics_prefix"]}_system_info_cpu_usage",
                 "value": cpu,
                 "help": "Representing the current system-wide CPU utilization as a percentage",
             },
@@ -306,7 +302,7 @@ def check_server_up(immichHost, immichPort):
             requests.request(
                 "GET",
                 f"http://{immichHost}:{immichPort}/api/server-info/ping",
-                headers={'Accept': 'application/json'}
+                headers={"Accept": "application/json"}
             )
         except requests.exceptions.RequestException as e:
             logger.error(
@@ -322,7 +318,7 @@ def check_server_up(immichHost, immichPort):
     logger.info(f"Found immich up and running at {immichHost}:{immichPort}.")
     logger.info("Attempting to connect to immich")
     time.sleep(1)
-    logger.info("Exporter 1.2.1")
+    logger.info("Exporter 1.3.0")
 
 
 def check_immich_api_key(immichHost, immichPort, immichApiKey):
@@ -391,7 +387,7 @@ def main():
     start_http_server(config["exporter_port"])
 
     logger.info(
-        f"Exporter listening on port {config['exporter_port']}"
+        f"Exporter listening on port {config["exporter_port"]}"
     )
 
     while not signal_handler.is_shutting_down():
