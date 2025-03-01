@@ -301,7 +301,7 @@ def check_server_up(immichHost, immichPort):
         try:
             requests.request(
                 "GET",
-                f"http://{immichHost}:{immichPort}/api/server-info/ping",
+                f"http://{immichHost}:{immichPort}/api/server/ping",
                 headers={"Accept": "application/json"}
             )
         except requests.exceptions.RequestException as e:
@@ -326,7 +326,7 @@ def check_immich_api_key(immichHost, immichPort, immichApiKey):
         try:
             requests.request(
                 "GET",
-                f"http://{immichHost}:{immichPort}/api/server-info/",
+                f"http://{immichHost}:{immichPort}/api/server/",
                 headers={
                     "Accept": "application/json",
                     "x-api-key": immichApiKey
