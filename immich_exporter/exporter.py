@@ -6,11 +6,13 @@ import faulthandler
 
 import requests
 import psutil
+from typing import Any, Generator
 
 from prometheus_client import start_http_server
-from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY
+from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY, Metric
+
 import logging
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.jsonlogger import JsonFormatter
 
 # Enable dumps on stderr in case of segfault
 faulthandler.enable()
@@ -19,28 +21,27 @@ logger = logging.getLogger()
 
 class ImmichMetricsCollector:
     def __init__(self, config):
-        self.config = config
+        self.config: dict[str, str] = config
 
-    def request(self, endpoint):
+    def request(self, endpoint: str):
         response = requests.request(
             "GET",
             self.combine_url(endpoint),
             headers={
                 "Accept": "application/json",
-                "x-api-key": self.config["token"]
+                "x-api-key": str(self.config["token"])
             }
         )
         return response
 
-
-    def collect(self):
+    def collect(self) -> Generator[Metric, None, None]:
         logger.info("Requested the metrics")
-        metrics = self.get_immich_metrics()
+        metrics: list[dict[str, str]] = self.get_immich_metrics()
 
         for metric in metrics:
-            name = metric["name"]
-            value = metric["value"]
-            help_text = metric.get("help", "")
+            name: str = metric["name"]
+            value: str = metric["value"]
+            help_text: str = metric.get("help", "")
             labels = metric.get("labels", {})
             metric_type = metric.get("type", "gauge")
 
@@ -52,8 +53,8 @@ class ImmichMetricsCollector:
             yield prom_metric
             logger.debug(prom_metric)
 
-    def get_immich_metrics(self):
-        metrics = []
+    def get_immich_metrics(self) -> list[dict[str, Any]]:
+        metrics: list[dict[str, str]] = []
         metrics.extend(self.get_immich_server_version_number())
         metrics.extend(self.get_immich_storage())
         metrics.extend(self.get_immich_users_stat())
@@ -61,20 +62,20 @@ class ImmichMetricsCollector:
 
         return metrics
 
-    def get_immich_users_stat(self):
+    def get_immich_users_stat(self) -> list[dict[str, Any]]:
         try:
             endpoint_user_stats = "/api/server/statistics"
             response = self.request(endpoint_user_stats).json()
         except requests.exceptions.RequestException as e:
             logger.error(f"API ERROR: can't get server statistic: {e}")
 
-        user_data = response["usageByUser"]
+        user_data: list[dict[str, object]] = response["usageByUser"]
         user_count = len(response["usageByUser"])
         photos_growth_total = response["photos"]
         videos_growth_total = response["videos"]
         usage_growth_total = response["usage"]
 
-        metrics = []
+        metrics: list[dict[str, any]] = []
 
         for x in range(0, user_count):
             # photos_growth_total += user_data[x]["photos"]
@@ -82,15 +83,15 @@ class ImmichMetricsCollector:
             # usage_growth_total += user_data[x]["usage"]
             metrics.append(
                 {
-                    "name": f"{self.config["metrics_prefix"]}_server_stats_photos_by_users",
+                    "name": f'{self.config["metrics_prefix"]}_server_stats_photos_by_users',
                     "value": user_data[x]["photos"],
-                    "labels": {"firstName": user_data[x]["userName"].split()[0]},
-                    "help": f"Number of photos by user {user_data[x]["userName"].split()[0]} "
+                    "labels": {"firstName": str(user_data[x]["userName"]).split()[0]},
+                    "help": f'Number of photos by user {user_data[x]["userName"].split()[0]} '
                 }
             )
             metrics.append(
                 {
-                    "name": f"{self.config["metrics_prefix"]}_server_stats_videos_by_users",
+                    "name": f'{self.config["metrics_prefix"]}_server_stats_videos_by_users',
                     "value": user_data[x]["videos"],
                     "labels": {"firstName": user_data[x]["userName"].split()[0]},
                     "help": f"Number of photos by user {user_data[x]["userName"].split()[0]} "
@@ -98,7 +99,7 @@ class ImmichMetricsCollector:
             )
             metrics.append(
                 {
-                    "name": f"{self.config["metrics_prefix"]}_server_stats_usage_by_users",
+                    "name": f'{self.config["metrics_prefix"]}_server_stats_usage_by_users',
                     "value": (user_data[x]["usage"]),
                     "labels": {
                         "firstName": user_data[x]["userName"].split()[0],
@@ -109,22 +110,22 @@ class ImmichMetricsCollector:
 
         metrics += [
             {
-                "name": f"{self.config["metrics_prefix"]}_server_stats_user_count",
+                "name": f'{self.config["metrics_prefix"]}_server_stats_user_count',
                 "value": user_count,
                 "help": "number of users on the immich server"
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_server_stats_photos_growth",
+                "name": f'{self.config["metrics_prefix"]}_server_stats_photos_growth',
                 "value": photos_growth_total,
                 "help": "photos counter that is added or removed"
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_server_stats_videos_growth",
+                "name": f'{self.config["metrics_prefix"]}_server_stats_videos_growth',
                 "value": videos_growth_total,
                 "help": "videos counter that is added or removed"
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_server_stats_usage_growth",
+                "name": f'{self.config["metrics_prefix"]}_server_stats_usage_growth',
                 "value": usage_growth_total,
                 "help": "videos counter that is added or removed"
             },
@@ -132,7 +133,7 @@ class ImmichMetricsCollector:
 
         return metrics
 
-    def get_immich_storage(self):
+    def get_immich_storage(self) -> list[dict[str, str]]:
         try:
             endpoint_storage = "/api/server/storage"
             response = self.request(endpoint_storage).json()
@@ -165,7 +166,7 @@ class ImmichMetricsCollector:
             }
         ]
 
-    def get_immich_server_version_number(self):
+    def get_immich_server_version_number(self) -> list[dict[str, Any]]:
         server_version_endpoint = "/api/server/about"
 
         while True:
@@ -178,10 +179,6 @@ class ImmichMetricsCollector:
 
         server_version_number = response["version"]
 
-        # server_version_number = (
-        #     str(response["major"]) + "." + str(response["minor"]) + "." + str(response["patch"])
-        # )
-
         return [
             {
                 "name": f"{self.config["metrics_prefix"]}_server_info_version_number",
@@ -192,70 +189,70 @@ class ImmichMetricsCollector:
             }
         ]
 
-    def get_system_stats(self):
+    def get_system_stats(self) -> list[dict[str, Any]]:
         loadAvg = os.getloadavg()
         virtualMem = psutil.virtual_memory()
         cpu = psutil.cpu_percent(interval=1, percpu=False)
         return [
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
+                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
                 "value": loadAvg[0],
                 "help": "CPU Load average 1m",
                 "labels": {"period": "1m"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
+                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
                 "value": loadAvg[1],
                 "help": "CPU Load average 5m",
                 "labels": {"period": "5m"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_loadAverage",
+                "name": f"{self.config['metrics_prefix']}_system_info_loadAverage",
                 "value": loadAvg[2],
                 "help": "CPU Load average 15m",
                 "labels": {"period": "15m"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
+                "name": f"{self.config['metrics_prefix']}_system_info_memory",
                 "value": virtualMem[0],
                 "help": "Virtual Memory - Total",
                 "labels": {"type": "Total"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
+                "name": f"{self.config['metrics_prefix']}_system_info_memory",
                 "value": virtualMem[1],
                 "help": "Virtual Memory - Available",
                 "labels": {"type": "Available"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
+                "name": f"{self.config['metrics_prefix']}_system_info_memory",
                 "value": virtualMem[2],
                 "help": "Virtual Memory - Percent",
                 "labels": {"type": "Percent"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
+                "name": f"{self.config['metrics_prefix']}_system_info_memory",
                 "value": virtualMem[3],
                 "help": "Virtual Memory - Used",
                 "labels": {"type": "Used"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_memory",
+                "name": f"{self.config['metrics_prefix']}_system_info_memory",
                 "value": virtualMem[4],
                 "help": "Virtual Memory - Free",
                 "labels": {"type": "Free"},
             },
             {
-                "name": f"{self.config["metrics_prefix"]}_system_info_cpu_usage",
+                "name": f"{self.config['metrics_prefix']}_system_info_cpu_usage",
                 "value": cpu,
                 "help": "Representing the current system-wide CPU utilization as a percentage",
             },
         ]
 
-    def combine_url(self, api_endpoint):
+    def combine_url(self, api_endpoint: str) -> str:
         prefix_url = "http://"
-        base_url = self.config["immich_host"]
-        base_url_port = self.config["immich_port"]
+        base_url: str = self.config["immich_host"]
+        base_url_port: str = self.config["immich_port"]
         combined_url = f"{prefix_url}{base_url}:{base_url_port}{api_endpoint}"
 
         return combined_url
@@ -281,7 +278,7 @@ class SignalHandler():
         self.shutdownCount += 1
 
 
-def get_config_value(key, default=""):
+def get_config_value(key: str, default: str = "") -> str:
     input_path = os.environ.get("FILE__" + key, None)
     if input_path is not None:
         try:
@@ -293,7 +290,7 @@ def get_config_value(key, default=""):
     return os.environ.get(key, default)
 
 
-def check_server_up(immichHost, immichPort):
+def check_server_up(immichHost: str, immichPort: str):
     counter = 0
 
     while True:
@@ -321,7 +318,7 @@ def check_server_up(immichHost, immichPort):
     logger.info("Exporter 1.3.0")
 
 
-def check_immich_api_key(immichHost, immichPort, immichApiKey):
+def check_immich_api_key(immichHost: str, immichPort: str, immichApiKey: str):
     while True:
         try:
             requests.request(
@@ -344,7 +341,8 @@ def check_immich_api_key(immichHost, immichPort, immichApiKey):
 def main():
     # Init logger so it can be used
     logHandler = logging.StreamHandler()
-    formatter = jsonlogger.JsonFormatter(
+
+    formatter: logging.Formatter = JsonFormatter(
         "%(asctime) %(levelname) %(message)",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
@@ -352,11 +350,11 @@ def main():
     logger.addHandler(logHandler)
     logger.setLevel("INFO")  # default until config is loaded
 
-    config = {
+    config: dict[str, str] = {
         "immich_host": get_config_value("IMMICH_HOST", ""),
         "immich_port": get_config_value("IMMICH_PORT", ""),
         "token": get_config_value("IMMICH_API_TOKEN", ""),
-        "exporter_port": int(get_config_value("EXPORTER_PORT", "8000")),
+        "exporter_port": get_config_value("EXPORTER_PORT", "8000"),
         "log_level": get_config_value("EXPORTER_LOG_LEVEL", "INFO"),
         "metrics_prefix": get_config_value("METRICS_PREFIX", "immich"),
     }
@@ -384,10 +382,10 @@ def main():
     REGISTRY.register(ImmichMetricsCollector(config))
 
     # Start server
-    start_http_server(config["exporter_port"])
+    start_http_server(int(config["exporter_port"]))
 
     logger.info(
-        f"Exporter listening on port {config["exporter_port"]}"
+        f"Exporter listening on port {config['exporter_port']}"
     )
 
     while not signal_handler.is_shutting_down():
